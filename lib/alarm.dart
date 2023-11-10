@@ -341,9 +341,7 @@ class _alarmPageState extends State<alarmPage> {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         ElevatedButton(
-                          onPressed: () {
-                            // 등록 버튼 동작
-                          },
+                          onPressed: () => Navigator.of(context).pop(),
                           style: ElevatedButton.styleFrom(
                             primary: Color(0xFF5521EB),
                             shape: RoundedRectangleBorder(

@@ -52,11 +52,13 @@ class _MainPageState extends State<MainPage> {
   int toggleValue = 0;
   int selectedChip = 0;
 
+  String startCoord_N = '';
+  String endCoord_N = '';
   String startCoord = '';
   String endCoord = '';
   List<dynamic> recommendedPosts = [];
   final List<String> chipLabels = [
-    '경영/비즈니스',
+    '전체',
     '서비스기획',
     '개발',
     '데이터/AI/ML',
@@ -120,8 +122,10 @@ class _MainPageState extends State<MainPage> {
       );
 
       if (response.statusCode == 200) {
+        var responseBody = utf8.decode(response.bodyBytes);
+
         setState(() {
-          recommendedPosts = json.decode(response.body);
+          recommendedPosts = json.decode(responseBody);
         });
       } else {
         print("Failed to load recommended posts");
@@ -131,11 +135,13 @@ class _MainPageState extends State<MainPage> {
     }
   }
 
-  Future<void> searchCoord(
+  Future<void> searchCoord_s(
       String startName, String endName, List<String> waypointNames) async {
     String baseUrl =
         "https://apis.openapi.sk.com/tmap/pois?version=1&count=1&searchKeyword=";
     String appKey = "l7xxf27945b5f29e4c9d8e9c478bcae12841"; // 실제 앱 키를 입력해야 함.
+    startCoord_N = startName;
+    endCoord_N = endName;
 
     try {
       var startResponse = await http.get(
@@ -183,7 +189,74 @@ class _MainPageState extends State<MainPage> {
         }
       });
 
-      fetchTravelTime(sx, sy, ex, ey);
+      // fetchTravelTime(sx, sy, ex, ey);
+      // _showMapPopup(sx, sy, ex, ey, endId, passList);
+
+      // 출발지와 도착지 좌표를 변수에 저장
+      startCoord = "출발지: ($sx, $sy)";
+      endCoord = "도착지: ($ex, $ey)";
+    } catch (e) {
+      setState(() {
+        coordinates = "오류 발생: $e";
+      });
+    }
+  }
+
+  Future<void> searchCoord(
+      String startName, String endName, List<String> waypointNames) async {
+    String baseUrl =
+        "https://apis.openapi.sk.com/tmap/pois?version=1&count=1&searchKeyword=";
+    String appKey = "l7xxf27945b5f29e4c9d8e9c478bcae12841"; // 실제 앱 키를 입력해야 함.
+    startCoord_N = startName;
+    endCoord_N = endName;
+
+    try {
+      var startResponse = await http.get(
+        Uri.parse("$baseUrl$startName&appKey=$appKey"),
+      );
+      var startData = json.decode(startResponse.body);
+      var startId = startData['searchPoiInfo']['pois']['poi'][0]['id'];
+      var sx = startData['searchPoiInfo']['pois']['poi'][0]['noorLon'];
+      var sy = startData['searchPoiInfo']['pois']['poi'][0]['noorLat'];
+
+      var endResponse = await http.get(
+        Uri.parse("$baseUrl$endName&appKey=$appKey"),
+      );
+      var endData = json.decode(endResponse.body);
+      var endId = endData['searchPoiInfo']['pois']['poi'][0]['id'];
+      var ex = endData['searchPoiInfo']['pois']['poi'][0]['noorLon'];
+      var ey = endData['searchPoiInfo']['pois']['poi'][0]['noorLat'];
+
+      String passList = "";
+
+      for (int i = 0; i < waypointNames.length; i++) {
+        if (waypointNames[i].isNotEmpty) {
+          var waypointResponse = await http.get(
+            Uri.parse("$baseUrl${waypointNames[i]}&appKey=$appKey"),
+          );
+          var waypointData = json.decode(waypointResponse.body);
+          var waypointId =
+              waypointData['searchPoiInfo']['pois']['poi'][0]['id'];
+          var waypointX =
+              waypointData['searchPoiInfo']['pois']['poi'][0]['noorLon'];
+          var waypointY =
+              waypointData['searchPoiInfo']['pois']['poi'][0]['noorLat'];
+
+          if (passList.isNotEmpty) {
+            passList += "_";
+          }
+          passList += "$waypointX,$waypointY,$waypointId";
+        }
+      }
+
+      setState(() {
+        coordinates = "출발: ($sx, $sy, $startId), 도착: ($ex, $ey, $endId)";
+        if (passList.isNotEmpty) {
+          coordinates += ", 경유지: $passList";
+        }
+      });
+
+      // fetchTravelTime(sx, sy, ex, ey);
       _showMapPopup(sx, sy, ex, ey, endId, passList);
 
       // 출발지와 도착지 좌표를 변수에 저장
@@ -194,6 +267,23 @@ class _MainPageState extends State<MainPage> {
         coordinates = "오류 발생: $e";
       });
     }
+  }
+
+  void onPostClicked(dynamic post) {
+    if (startCoord_N.isEmpty || endCoord_N.isEmpty) {
+      showPopup("출발지와 도착지를 입력해주셔야 상세 정보를 확인할 수 있습니다");
+      return;
+    }
+
+    // 게시글에서 출발지와 도착지를 가져옵니다.
+    String postDeparture = post['departureAddress'];
+    String postDestination = post['destinationAddress'];
+
+    // 경유지 목록에 게시글의 출발지와 도착지를 추가합니다.
+    List<String> waypointNames = [postDeparture, postDestination];
+
+    // searchCoord 함수를 호출합니다.
+    searchCoord(startCoord_N, endCoord_N, waypointNames);
   }
 
   Future<void> fetchTravelTime(
@@ -305,22 +395,25 @@ class _MainPageState extends State<MainPage> {
     final userId = prefs.getInt('userAppCode') ?? '없음';
 
     Future<void> sendPostData() async {
+      // 출발지와 도착지의 좌표를 검색합니다.
+      await searchCoord_s(startLocation, endLocation, []);
+
       String url = 'http://43.202.218.152/post'; // 실제 서버 URL로 변경 필요
       Map<String, dynamic> postData = {
         "title": title,
         "body": details,
-        "userId": userId, // 예시로 1을 넣었지만, 실제 사용자 ID로 변경 필요
+        "userId": userId,
         "departureAddress": startLocation,
         "destinationAddress": endLocation,
-        "departLat": 35.123124,
-        "departLon": 127.123124,
-        "destiLat": 37.4630846,
-        "destiLon": 126.731245,
+        "departLat": startCoord.split('(')[1].split(',')[0],
+        "departLon": startCoord.split(',')[1].split(')')[0],
+        "destiLat": endCoord.split('(')[1].split(',')[0],
+        "destiLon": endCoord.split(',')[1].split(')')[0],
         "timeRange": {
-          "from": "YYYY-MM-DD:hh:mm", // 실제 시간 데이터로 변경 필요
-          "to": "YYYY-MM-DD:hh:mm" // 실제 시간 데이터로 변경 필요
+          "from": "2023-11-11:00:00", // 실제 시간 데이터로 변경 필요
+          "to": "2023-11-12:12:00" // 실제 시간 데이터로 변경 필요
         },
-        "payRaito": 0.3,
+        "payRatio": 0.3,
         "type": mentorMenteeToggle == 0 ? "MENTOR" : "MENTEE",
         "transformation": carpoolTaxiToggle == 0 ? "CARPOOL" : "TAXI"
       };
@@ -332,11 +425,11 @@ class _MainPageState extends State<MainPage> {
           body: jsonEncode(postData),
         );
 
-        if (response.statusCode == 200) {
-          print('Server Response: ${response.body}');
-        } else {
-          print('Request failed with status: ${response.statusCode}.');
-        }
+        // if (response.statusCode == 200) {
+        //   print('Server Response: ${response.body}');
+        // } else {
+        //   print('Request failed with status: ${response.statusCode}.');
+        // }
       } catch (e) {
         print('Error sending post data: $e');
       }
@@ -411,33 +504,33 @@ class _MainPageState extends State<MainPage> {
                                 _formKey.currentState!.save();
                                 sendPostData(); // 서버에 데이터 전송
                                 Navigator.pop(context);
-                                showDialog(
-                                  context: context,
-                                  builder: (context) => AlertDialog(
-                                    title: Text("등록 내용 확인"),
-                                    content: SingleChildScrollView(
-                                      child: ListBody(
-                                        children: <Widget>[
-                                          Text("제목: $title"),
-                                          Text("출발지: $startLocation"),
-                                          Text("도착지: $endLocation"),
-                                          Text("상세내용: $details"),
-                                          Text(
-                                              "멘토/멘티: ${mentorMenteeToggle == 0 ? "멘토" : "멘티"}"),
-                                          Text(
-                                              "카풀/택시: ${carpoolTaxiToggle == 0 ? "카풀" : "택시"}"),
-                                        ],
-                                      ),
-                                    ),
-                                    actions: <Widget>[
-                                      TextButton(
-                                        child: Text("닫기"),
-                                        onPressed: () =>
-                                            Navigator.of(context).pop(),
-                                      ),
-                                    ],
-                                  ),
-                                );
+                                // showDialog(
+                                //   context: context,
+                                //   builder: (context) => AlertDialog(
+                                //     title: Text("등록 내용 확인"),
+                                //     content: SingleChildScrollView(
+                                //       child: ListBody(
+                                //         children: <Widget>[
+                                //           Text("제목: $title"),
+                                //           Text("출발지: $startLocation"),
+                                //           Text("도착지: $endLocation"),
+                                //           Text("상세내용: $details"),
+                                //           Text(
+                                //               "멘토/멘티: ${mentorMenteeToggle == 0 ? "멘토" : "멘티"}"),
+                                //           Text(
+                                //               "카풀/택시: ${carpoolTaxiToggle == 0 ? "카풀" : "택시"}"),
+                                //         ],
+                                //       ),
+                                //     ),
+                                //     actions: <Widget>[
+                                //       TextButton(
+                                //         child: Text("닫기"),
+                                //         onPressed: () =>
+                                //             Navigator.of(context).pop(),
+                                //       ),
+                                //     ],
+                                //   ),
+                                // );
                               }
                             },
                             style: ElevatedButton.styleFrom(
@@ -500,6 +593,35 @@ class _MainPageState extends State<MainPage> {
         onSaved: onSave,
       ),
     );
+  }
+
+  // 필터 옵션을 저장하는 변수 추가
+  String filterOption = '전체';
+
+  // 필터에 따라 게시글 목록을 조건부로 반환하는 함수
+  List<dynamic> getFilteredPosts() {
+    // 현재 선택된 카테고리
+    String selectedCategory = chipLabels[selectedChip];
+
+    // 필터링된 게시글 목록
+    List<dynamic> filteredPosts = recommendedPosts;
+
+    // 멘토/멘티 필터링
+    if (filterOption != '전체') {
+      filteredPosts = filteredPosts
+          .where((post) =>
+              post['type'] == (filterOption == '멘토' ? 'MENTOR' : 'MENTEE'))
+          .toList();
+    }
+
+    // 카테고리 필터링 (전체가 아닌 경우에만)
+    if (selectedChip != 0) {
+      filteredPosts = filteredPosts
+          .where((post) => post['userInfo']['category'] == selectedCategory)
+          .toList();
+    }
+
+    return filteredPosts;
   }
 
   @override
@@ -596,11 +718,13 @@ class _MainPageState extends State<MainPage> {
                   SizedBox(width: 8),
                   ElevatedButton(
                     onPressed: () {
-                      List<String> waypointNames =
-                          waypointControllers.map((c) => c.text).toList();
-                      searchCoord(startController.text, endController.text,
-                          waypointNames);
-                      printCoordinates();
+                      // List<String> waypointNames =
+                      //     waypointControllers.map((c) => c.text).toList();
+                      // searchCoord(startController.text, endController.text,
+                      //     waypointNames);
+                      startCoord_N = startController.text;
+                      endCoord_N = endController.text;
+                      showPopup("이제 상세 경로를 확인하실 수 있습니다.");
                     },
                     style: ElevatedButton.styleFrom(
                       primary: Color(0xFFFAFBFD), // 배경색
@@ -633,10 +757,12 @@ class _MainPageState extends State<MainPage> {
                         borderRadius: 15,
                         backgroundColor: Color(0xFFB9BBE9),
                         options: ['전체', '멘토', '멘티'],
-                        toggleValue: toggleValue,
-                        onChanged: (value) {
+                        toggleValue: filterOption == '전체'
+                            ? 0
+                            : (filterOption == '멘토' ? 1 : 2),
+                        onChanged: (index) {
                           setState(() {
-                            toggleValue = value;
+                            filterOption = ['전체', '멘토', '멘티'][index];
                           });
                         },
                       ),
@@ -696,75 +822,88 @@ class _MainPageState extends State<MainPage> {
               Container(
                 child: Expanded(
                   child: ListView.builder(
-                    itemCount: items.length, // 데이터 리스트의 아이템 개수
+                    itemCount: getFilteredPosts().length, // 필터링된 게시글 목록 길이 사용
                     itemBuilder: (BuildContext context, int index) {
-                      return Container(
-                        margin: EdgeInsets.all(5), // 컨테이너의 마진값
-                        padding: EdgeInsets.all(5), // 컨테이너의 패딩값
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(8), // 모서리 둥글기
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black26,
-                              blurRadius: 4,
-                              offset: Offset(2, 2),
-                            ),
-                          ],
-                        ),
-                        child: Row(
-                          children: [
-                            Container(
-                              width: 44,
-                              height: 52,
-                              decoration: BoxDecoration(
-                                borderRadius:
-                                    BorderRadius.circular(8), // 이미지 모서리 둥글기
-                                image: DecorationImage(
-                                  image: NetworkImage(
-                                      'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcR5TulwreiAilalNuCPYfWqf1uaFawcRHBSgekfTY-WMC3hCz449Gq3Tnnl08SikllFBXE&usqp=CAU'), // 네트워크 이미지
-                                  fit: BoxFit.cover,
+                      var post = getFilteredPosts()[index]; // 필터링된 게시글 목록 사용
+                      var title = post['title']; // 'title' 키를 사용하여 타이틀을 가져옵니다.
+                      var departure = post['departureAddress'] ??
+                          '출발지 정보 없음'; // 'departureAddress' 키를 사용합니다.
+                      var destination = post['destinationAddress'] ??
+                          '도착지 정보 없음'; // 'destinationAddress' 키를 사용합니다.
+                      var subtitle =
+                          '$departure - $destination'; // 출발지와 도착지를 연결하여 표시합니다.
+                      var tag = post['type'] == 'MENTOR'
+                          ? '멘토'
+                          : '멘티'; // 'type' 키를 기반으로 태그를 결정합니다.
+
+                      return GestureDetector(
+                        onTap: () => onPostClicked(post),
+                        child: Container(
+                          margin: EdgeInsets.all(5),
+                          padding: EdgeInsets.all(5),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(8),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black26,
+                                blurRadius: 4,
+                                offset: Offset(2, 2),
+                              ),
+                            ],
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 44,
+                                height: 52,
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(8),
+                                  image: DecorationImage(
+                                    image: NetworkImage(
+                                        'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcR5TulwreiAilalNuCPYfWqf1uaFawcRHBSgekfTY-WMC3hCz449Gq3Tnnl08SikllFBXE&usqp=CAU'), // 네트워크 이미지
+                                    fit: BoxFit.cover,
+                                  ),
                                 ),
                               ),
-                            ),
-                            SizedBox(width: 10),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    '타이틀', // 타이틀
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                  Text(
-                                    '서브 타이틀', // 서브 타이틀
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      color: Color(0xFF8A8BB1),
-                                    ),
-                                  ),
-                                  Container(
-                                    padding: EdgeInsets.all(5),
-                                    decoration: BoxDecoration(
-                                      color: Color(0xFFFFD600), // 배경색
-                                      borderRadius:
-                                          BorderRadius.circular(8), // 모서리 둥글기
-                                    ),
-                                    child: Text(
-                                      '멘토', // 멘토 혹은 멘티
+                              SizedBox(width: 10),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      title ?? '제목 없음', // 타이틀
                                       style: TextStyle(
-                                        fontSize: 10,
-                                        color: Colors.black,
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.bold,
                                       ),
                                     ),
-                                  ),
-                                ],
+                                    Text(
+                                      subtitle, // 서브 타이틀: 출발지 - 도착지
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        color: Color(0xFF8A8BB1),
+                                      ),
+                                    ),
+                                    Container(
+                                      padding: EdgeInsets.all(5),
+                                      decoration: BoxDecoration(
+                                        color: Color(0xFFFFD600),
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: Text(
+                                        tag, // 태그
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          color: Colors.black,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                       );
                     },
