@@ -11,9 +11,9 @@ void main() async {
   WidgetsFlutterBinding
       .ensureInitialized(); // Ensure plugin services are initialized
   final prefs = await SharedPreferences.getInstance();
-  final isFirstStart = prefs.getBool('isFirstStart') ??
-      true; // Get isFirstStart value, default to true
-  // final isFirstStart = true;
+  // final isFirstStart = prefs.getBool('isFirstStart') ??
+  //     true; // Get isFirstStart value, default to true
+  final isFirstStart = true;
 
   runApp(MyApp(isFirstStart: isFirstStart));
 }
@@ -306,7 +306,11 @@ class _MainPageState extends State<MainPage> {
                   ),
                   IconButton(
                     icon: const Icon(Icons.settings),
-                    onPressed: () => showPopup("설정입니다"),
+                    onPressed: () async {
+                      final prefs = await SharedPreferences.getInstance();
+                      final userId = prefs.getInt('userAppCode') ?? '없음';
+                      showPopup("User ID: $userId");
+                    },
                   ),
                 ],
               ),
