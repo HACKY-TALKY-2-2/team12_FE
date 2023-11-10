@@ -99,7 +99,20 @@ class _MainPageState extends State<MainPage> {
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: Text("게시글 등록"),
+          title: Text(
+            "게시글 등록",
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontWeight: FontWeight.w600,
+              fontSize: 16,
+              color: Colors.black,
+            ),
+          ),
+          shape: RoundedRectangleBorder(
+            // 모서리 둥글게
+            borderRadius: BorderRadius.all(Radius.circular(10)),
+          ),
+          contentPadding: EdgeInsets.fromLTRB(10, 0, 10, 10), // 여기서 조정합니다
           content: StatefulBuilder(
             builder: (BuildContext context, StateSetter setState) {
               return SingleChildScrollView(
@@ -108,6 +121,9 @@ class _MainPageState extends State<MainPage> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: <Widget>[
+                      SizedBox(height: 10),
+                      Divider(color: Color(0xFFE1E1E1)),
+                      SizedBox(height: 10),
                       CustomToggleSwitch(
                         height: 30,
                         borderRadius: 15,
@@ -120,10 +136,7 @@ class _MainPageState extends State<MainPage> {
                           });
                         },
                       ),
-                      TextFormField(
-                        decoration: InputDecoration(labelText: '게시글 제목'),
-                        onSaved: (value) => title = value ?? '',
-                      ),
+                      SizedBox(height: 10),
                       CustomToggleSwitch(
                         height: 30,
                         borderRadius: 15,
@@ -136,59 +149,83 @@ class _MainPageState extends State<MainPage> {
                           });
                         },
                       ),
-                      TextFormField(
-                        decoration: InputDecoration(labelText: '출발지'),
-                        onSaved: (value) => startLocation = value ?? '',
-                      ),
-                      TextFormField(
-                        decoration: InputDecoration(labelText: '도착지'),
-                        onSaved: (value) => endLocation = value ?? '',
-                      ),
-                      TextFormField(
-                        decoration: InputDecoration(labelText: '상세내용'),
-                        onSaved: (value) => details = value ?? '',
-                      ),
-                      ElevatedButton(
-                        onPressed: () {
-                          if (_formKey.currentState!.validate()) {
-                            _formKey.currentState!.save();
-                            // 여기에 등록 로직 추가
-                            // 예: 서버에 데이터 전송 등
-                            Navigator.pop(context);
-                            showDialog(
-                              context: context,
-                              builder: (context) => AlertDialog(
-                                title: Text("등록 내용 확인"),
-                                content: SingleChildScrollView(
-                                  child: ListBody(
-                                    children: <Widget>[
-                                      Text("제목: $title"),
-                                      Text("출발지: $startLocation"),
-                                      Text("도착지: $endLocation"),
-                                      Text("상세내용: $details"),
-                                      Text(
-                                          "멘토/멘티: ${mentorMenteeToggle == 0 ? "멘토" : "멘티"}"),
-                                      Text(
-                                          "카풀/택시: ${carpoolTaxiToggle == 0 ? "카풀" : "택시"}"),
+                      SizedBox(height: 10),
+                      buildTextField('게시글 제목', title),
+                      buildTextField('출발지', startLocation),
+                      buildTextField('도착지', endLocation),
+                      buildTextField('상세내용', details),
+                      SizedBox(height: 20),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          ElevatedButton(
+                            onPressed: () {
+                              if (_formKey.currentState!.validate()) {
+                                _formKey.currentState!.save();
+                                // 여기에 등록 로직 추가
+                                // 예: 서버에 데이터 전송 등
+                                Navigator.pop(context);
+                                showDialog(
+                                  context: context,
+                                  builder: (context) => AlertDialog(
+                                    title: Text("등록 내용 확인"),
+                                    content: SingleChildScrollView(
+                                      child: ListBody(
+                                        children: <Widget>[
+                                          Text("제목: $title"),
+                                          Text("출발지: $startLocation"),
+                                          Text("도착지: $endLocation"),
+                                          Text("상세내용: $details"),
+                                          Text(
+                                              "멘토/멘티: ${mentorMenteeToggle == 0 ? "멘토" : "멘티"}"),
+                                          Text(
+                                              "카풀/택시: ${carpoolTaxiToggle == 0 ? "카풀" : "택시"}"),
+                                        ],
+                                      ),
+                                    ),
+                                    actions: <Widget>[
+                                      TextButton(
+                                        child: Text("닫기"),
+                                        onPressed: () =>
+                                            Navigator.of(context).pop(),
+                                      ),
                                     ],
                                   ),
-                                ),
-                                actions: <Widget>[
-                                  TextButton(
-                                    child: Text("닫기"),
-                                    onPressed: () =>
-                                        Navigator.of(context).pop(),
-                                  ),
-                                ],
+                                );
+                              }
+                            },
+                            style: ElevatedButton.styleFrom(
+                              primary: Color(0xFF5521EB), // 배경색
+                              shape: RoundedRectangleBorder(
+                                borderRadius:
+                                    BorderRadius.circular(10), // 라운드 모서리
                               ),
-                            );
-                          }
-                        },
-                        child: Text('등록'),
-                      ),
-                      TextButton(
-                        onPressed: () => Navigator.of(context).pop(),
-                        child: Text('닫기'),
+                              minimumSize: Size(120, 40), // 너비와 높이
+                            ),
+                            child: Text('등록'),
+                          ),
+                          ElevatedButton(
+                            onPressed: () => Navigator.of(context).pop(),
+                            style: ElevatedButton.styleFrom(
+                              primary: Color(0xFFFAFBFD), // 배경색
+                              side:
+                                  BorderSide(color: Color(0xFF5521EB)), // 보더 색상
+                              shape: RoundedRectangleBorder(
+                                borderRadius:
+                                    BorderRadius.circular(10), // 라운드 모서리
+                              ),
+                              minimumSize: Size(120, 40), // 너비와 높이
+                            ),
+                            child: Text(
+                              '닫기',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                                color: Color(0xFF5521EB), // 글씨색
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
@@ -198,6 +235,27 @@ class _MainPageState extends State<MainPage> {
           ),
         );
       },
+    );
+  }
+
+  Widget buildTextField(String label, String value) {
+    return Container(
+      height: 40,
+      margin: EdgeInsets.only(bottom: 10),
+      child: TextFormField(
+        initialValue: value,
+        decoration: InputDecoration(
+          labelText: label,
+          border: OutlineInputBorder(
+            borderSide: BorderSide(color: Color(0xFFBFC0C7)),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          contentPadding: EdgeInsets.symmetric(horizontal: 10),
+        ),
+        onSaved: (newValue) {
+          // Update the value
+        },
+      ),
     );
   }
 
@@ -291,14 +349,23 @@ class _MainPageState extends State<MainPage> {
                   SizedBox(width: 8),
                   ElevatedButton(
                     onPressed: () {
-                      // TODO: 검색 기능 구현
+                      // 검색 기능 구현
                     },
                     style: ElevatedButton.styleFrom(
-                      minimumSize: Size(79, 66),
+                      primary: Color(0xFFFAFBFD), // 배경색
+                      side: BorderSide(color: Color(0xFF615CEC)), // 보더 색상
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10), // 라운드 모서리
+                      ),
+                      minimumSize: Size(79, 70), // 너비와 높이
                     ),
                     child: Text(
                       '검색',
-                      style: TextStyle(fontSize: 13),
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                        color: Color(0xFF615CEC), // 글씨색
+                      ),
                     ),
                   ),
                 ],
@@ -508,7 +575,7 @@ class CustomToggleSwitch extends StatelessWidget {
     return Container(
       height: height,
       decoration: BoxDecoration(
-        color: backgroundColor,
+        color: Color(0xFFB9BBE9), // 수정됨: 배경색을 흰색으로 설정
         borderRadius: BorderRadius.circular(borderRadius),
       ),
       child: Row(
@@ -523,7 +590,7 @@ class CustomToggleSwitch extends StatelessWidget {
               onTap: () => onChanged(idx),
               child: Container(
                 decoration: BoxDecoration(
-                  color: isSelected ? Color(0xFF615CEC) : Colors.transparent,
+                  color: isSelected ? Color(0xFF615CEC) : Color(0xFFB9BBE9),
                   borderRadius: BorderRadius.circular(borderRadius),
                 ),
                 alignment: Alignment.center,
