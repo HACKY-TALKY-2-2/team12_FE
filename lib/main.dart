@@ -11,9 +11,9 @@ void main() async {
   WidgetsFlutterBinding
       .ensureInitialized(); // Ensure plugin services are initialized
   final prefs = await SharedPreferences.getInstance();
-  // final isFirstStart = prefs.getBool('isFirstStart') ??
-  //     true; // Get isFirstStart value, default to true
-  final isFirstStart = true;
+  final isFirstStart = prefs.getBool('isFirstStart') ??
+      true; // Get isFirstStart value, default to true
+  // final isFirstStart = true;
 
   runApp(MyApp(isFirstStart: isFirstStart));
 }
@@ -43,17 +43,40 @@ class MainPage extends StatefulWidget {
 class _MainPageState extends State<MainPage> {
   TextEditingController startController = TextEditingController();
   TextEditingController endController = TextEditingController();
-  int toggleValue = 0; // 토글의 현재 위치를 저장합니다.
-  int selectedChip = 0; // 아무것도 선택되지 않았을 때는 -1
+  List<TextEditingController> waypointControllers = List.generate(
+    5,
+    (index) => TextEditingController(),
+  );
+  String coordinates = '';
+  String travelTime = '';
+  int toggleValue = 0;
+  int selectedChip = 0;
+
+  String startCoord = '';
+  String endCoord = '';
+  List<dynamic> recommendedPosts = [];
   final List<String> chipLabels = [
-    'IT',
-    '인사',
-    '품질관리',
-    '마케팅',
-    '회계',
-    '취직',
-    '재무관리',
-    '응용통계',
+    '경영/비즈니스',
+    '서비스기획',
+    '개발',
+    '데이터/AI/ML',
+    '마케팅/광고/홍보',
+    '디자인',
+    '미디어/커뮤니케이션',
+    '이커머스/리테일',
+    '금융/컨설팅/VC',
+    '회계/재무',
+    '인사/채용/노무',
+    '고객/영업',
+    '게임 기획/개발',
+    '물류/구매',
+    '의료/제약/바이오',
+    '연구/R&D',
+    '엔지니어링/설계',
+    '생산/품질',
+    '교육',
+    '법률/특허',
+    '공공/복지/환경',
   ];
   final List<String> items = [
     'IT',
@@ -65,6 +88,190 @@ class _MainPageState extends State<MainPage> {
     '재무관리',
     '응용통계',
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    checkFirstStartAndFetchData();
+  }
+
+  // 콘솔에 출발지와 도착지 좌표 출력
+  void printCoordinates() {
+    print(startCoord);
+    print(endCoord);
+  }
+
+  Future<void> checkFirstStartAndFetchData() async {
+    final prefs = await SharedPreferences.getInstance();
+    final isFirstStart = prefs.getBool('isFirstStart') ?? true;
+
+    if (!isFirstStart) {
+      // isFirstStart가 false일 경우
+      final userId = prefs.getInt('userAppCode') ?? 0;
+      await fetchRecommendedPosts(userId);
+      print(recommendedPosts); // 콘솔에 추천 게시글 데이터 출력
+    }
+  }
+
+  Future<void> fetchRecommendedPosts(int userId) async {
+    try {
+      final response = await http.get(
+        Uri.parse("http://43.202.218.152/user/$userId/recommended-post"),
+      );
+
+      if (response.statusCode == 200) {
+        setState(() {
+          recommendedPosts = json.decode(response.body);
+        });
+      } else {
+        print("Failed to load recommended posts");
+      }
+    } catch (e) {
+      print("Error occurred: $e");
+    }
+  }
+
+  Future<void> searchCoord(
+      String startName, String endName, List<String> waypointNames) async {
+    String baseUrl =
+        "https://apis.openapi.sk.com/tmap/pois?version=1&count=1&searchKeyword=";
+    String appKey = "l7xxf27945b5f29e4c9d8e9c478bcae12841"; // 실제 앱 키를 입력해야 함.
+
+    try {
+      var startResponse = await http.get(
+        Uri.parse("$baseUrl$startName&appKey=$appKey"),
+      );
+      var startData = json.decode(startResponse.body);
+      var startId = startData['searchPoiInfo']['pois']['poi'][0]['id'];
+      var sx = startData['searchPoiInfo']['pois']['poi'][0]['noorLon'];
+      var sy = startData['searchPoiInfo']['pois']['poi'][0]['noorLat'];
+
+      var endResponse = await http.get(
+        Uri.parse("$baseUrl$endName&appKey=$appKey"),
+      );
+      var endData = json.decode(endResponse.body);
+      var endId = endData['searchPoiInfo']['pois']['poi'][0]['id'];
+      var ex = endData['searchPoiInfo']['pois']['poi'][0]['noorLon'];
+      var ey = endData['searchPoiInfo']['pois']['poi'][0]['noorLat'];
+
+      String passList = "";
+
+      for (int i = 0; i < waypointNames.length; i++) {
+        if (waypointNames[i].isNotEmpty) {
+          var waypointResponse = await http.get(
+            Uri.parse("$baseUrl${waypointNames[i]}&appKey=$appKey"),
+          );
+          var waypointData = json.decode(waypointResponse.body);
+          var waypointId =
+              waypointData['searchPoiInfo']['pois']['poi'][0]['id'];
+          var waypointX =
+              waypointData['searchPoiInfo']['pois']['poi'][0]['noorLon'];
+          var waypointY =
+              waypointData['searchPoiInfo']['pois']['poi'][0]['noorLat'];
+
+          if (passList.isNotEmpty) {
+            passList += "_";
+          }
+          passList += "$waypointX,$waypointY,$waypointId";
+        }
+      }
+
+      setState(() {
+        coordinates = "출발: ($sx, $sy, $startId), 도착: ($ex, $ey, $endId)";
+        if (passList.isNotEmpty) {
+          coordinates += ", 경유지: $passList";
+        }
+      });
+
+      fetchTravelTime(sx, sy, ex, ey);
+      _showMapPopup(sx, sy, ex, ey, endId, passList);
+
+      // 출발지와 도착지 좌표를 변수에 저장
+      startCoord = "출발지: ($sx, $sy)";
+      endCoord = "도착지: ($ex, $ey)";
+    } catch (e) {
+      setState(() {
+        coordinates = "오류 발생: $e";
+      });
+    }
+  }
+
+  Future<void> fetchTravelTime(
+      String sx, String sy, String ex, String ey) async {
+    String url =
+        "https://apis.openapi.sk.com/tmap/routes?version=1&format=json&callback=result";
+    Map<String, String> headers = {
+      "Content-Type": "application/x-www-form-urlencoded"
+    };
+    Map<String, String> body = {
+      "appKey": "l7xxf27945b5f29e4c9d8e9c478bcae12841",
+      "startX": sx,
+      "startY": sy,
+      "endX": ex,
+      "endY": ey,
+      "reqCoordType": "WGS84GEO",
+      "resCoordType": "EPSG3857",
+      "searchOption": "0",
+      "trafficInfo": "N"
+    };
+
+    try {
+      var response =
+          await http.post(Uri.parse(url), headers: headers, body: body);
+      if (response.statusCode == 200) {
+        var data = json.decode(response.body);
+        var totalTime =
+            data['features'][0]['properties']['totalTime']; // 실제 응답에 맞게 조정
+        setState(() {
+          travelTime = "예상 이동 시간: ${totalTime ~/ 60} 분";
+        });
+      } else {
+        setState(() {
+          travelTime = "이동 시간 가져오기 실패";
+        });
+      }
+    } catch (e) {
+      setState(() {
+        travelTime = "오류 발생: $e";
+      });
+    }
+  }
+
+  void _showMapPopup(String sx, String sy, String ex, String ey, String endId,
+      String passList) {
+    String appKey = "l7xxf27945b5f29e4c9d8e9c478bcae12841"; // 실제 앱 키를 입력해야 함.
+    String initialUrl =
+        'https://apis.openapi.sk.com/tmap/routeStaticMap?appKey=$appKey&endX=$ex&endY=$ey&startX=$sx&startY=$sy&reqCoordType=WGS84GEO&endPoiId=$endId';
+
+    if (passList.isNotEmpty) {
+      initialUrl += "&passList=$passList";
+    }
+    initialUrl += "&lineColor=red&width=512&height=512";
+
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          content: Container(
+            width: double.maxFinite,
+            height: 350,
+            child: WebView(
+              initialUrl: initialUrl,
+              javascriptMode: JavascriptMode.unrestricted,
+            ),
+          ),
+          actions: <Widget>[
+            TextButton(
+              child: Text('닫기'),
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
 
   void showPopup(String message) {
     showDialog(
@@ -86,7 +293,7 @@ class _MainPageState extends State<MainPage> {
     );
   }
 
-  void showPostDialog(BuildContext context) {
+  void showPostDialog(BuildContext context) async {
     final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
     String title = '';
     String startLocation = '';
@@ -94,6 +301,46 @@ class _MainPageState extends State<MainPage> {
     String details = '';
     int mentorMenteeToggle = 0;
     int carpoolTaxiToggle = 0;
+    final prefs = await SharedPreferences.getInstance();
+    final userId = prefs.getInt('userAppCode') ?? '없음';
+
+    Future<void> sendPostData() async {
+      String url = 'http://43.202.218.152/post'; // 실제 서버 URL로 변경 필요
+      Map<String, dynamic> postData = {
+        "title": title,
+        "body": details,
+        "userId": userId, // 예시로 1을 넣었지만, 실제 사용자 ID로 변경 필요
+        "departureAddress": startLocation,
+        "destinationAddress": endLocation,
+        "departLat": 35.123124,
+        "departLon": 127.123124,
+        "destiLat": 37.4630846,
+        "destiLon": 126.731245,
+        "timeRange": {
+          "from": "YYYY-MM-DD:hh:mm", // 실제 시간 데이터로 변경 필요
+          "to": "YYYY-MM-DD:hh:mm" // 실제 시간 데이터로 변경 필요
+        },
+        "payRaito": 0.3,
+        "type": mentorMenteeToggle == 0 ? "MENTOR" : "MENTEE",
+        "transformation": carpoolTaxiToggle == 0 ? "CARPOOL" : "TAXI"
+      };
+
+      try {
+        var response = await http.post(
+          Uri.parse(url),
+          headers: {"Content-Type": "application/json"},
+          body: jsonEncode(postData),
+        );
+
+        if (response.statusCode == 200) {
+          print('Server Response: ${response.body}');
+        } else {
+          print('Request failed with status: ${response.statusCode}.');
+        }
+      } catch (e) {
+        print('Error sending post data: $e');
+      }
+    }
 
     showDialog(
       context: context,
@@ -150,10 +397,10 @@ class _MainPageState extends State<MainPage> {
                         },
                       ),
                       SizedBox(height: 10),
-                      buildTextField('게시글 제목', title),
-                      buildTextField('출발지', startLocation),
-                      buildTextField('도착지', endLocation),
-                      buildTextField('상세내용', details),
+                      buildTextField('게시글 제목', (value) => title = value!),
+                      buildTextField('출발지', (value) => startLocation = value!),
+                      buildTextField('도착지', (value) => endLocation = value!),
+                      buildTextField('상세내용', (value) => details = value!),
                       SizedBox(height: 20),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -162,8 +409,7 @@ class _MainPageState extends State<MainPage> {
                             onPressed: () {
                               if (_formKey.currentState!.validate()) {
                                 _formKey.currentState!.save();
-                                // 여기에 등록 로직 추가
-                                // 예: 서버에 데이터 전송 등
+                                sendPostData(); // 서버에 데이터 전송
                                 Navigator.pop(context);
                                 showDialog(
                                   context: context,
@@ -238,12 +484,11 @@ class _MainPageState extends State<MainPage> {
     );
   }
 
-  Widget buildTextField(String label, String value) {
+  Widget buildTextField(String label, void Function(String?) onSave) {
     return Container(
       height: 40,
       margin: EdgeInsets.only(bottom: 10),
       child: TextFormField(
-        initialValue: value,
         decoration: InputDecoration(
           labelText: label,
           border: OutlineInputBorder(
@@ -252,9 +497,7 @@ class _MainPageState extends State<MainPage> {
           ),
           contentPadding: EdgeInsets.symmetric(horizontal: 10),
         ),
-        onSaved: (newValue) {
-          // Update the value
-        },
+        onSaved: onSave,
       ),
     );
   }
@@ -353,7 +596,11 @@ class _MainPageState extends State<MainPage> {
                   SizedBox(width: 8),
                   ElevatedButton(
                     onPressed: () {
-                      // 검색 기능 구현
+                      List<String> waypointNames =
+                          waypointControllers.map((c) => c.text).toList();
+                      searchCoord(startController.text, endController.text,
+                          waypointNames);
+                      printCoordinates();
                     },
                     style: ElevatedButton.styleFrom(
                       primary: Color(0xFFFAFBFD), // 배경색

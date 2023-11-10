@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -632,50 +633,39 @@ class _FirstPageState extends State<FirstPage> {
                 SizedBox(height: 13),
                 Container(
                   height: 40.0,
-                  child: TextField(
-                    controller: fieldController,
+                  child: DropdownButtonFormField<String>(
+                    value: selectedJob,
+                    onChanged: (String? newValue) {
+                      setState(() {
+                        selectedJob = newValue!;
+                        selectedSubJob = '직무';
+                        fieldController.text =
+                            newValue; // 선택한 값을 fieldController에 저장
+                      });
+                    },
+                    items: jobs.map((String value) {
+                      return DropdownMenuItem<String>(
+                        value: value,
+                        child: Container(
+                          child: Text(value),
+                          constraints: BoxConstraints(
+                            maxWidth: MediaQuery.of(context).size.width * 0.5,
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                    isExpanded: true,
+                    iconSize: 24,
+                    iconEnabledColor: Color(0xFFBFC0C7),
                     decoration: InputDecoration(
-                      hintText: '분야',
-                      contentPadding: EdgeInsets.symmetric(
-                          vertical: 10.0, horizontal: 10.0),
                       border: OutlineInputBorder(
                         borderSide: BorderSide(color: Color(0xFFBFC0C7)),
                         borderRadius: BorderRadius.circular(10),
                       ),
+                      contentPadding: EdgeInsets.symmetric(
+                          vertical: 10.0, horizontal: 10.0),
                       filled: true,
                       fillColor: Color(0xFFFAFBFD),
-                      suffixIcon: DropdownButtonHideUnderline(
-                        child: DropdownButtonFormField<String>(
-                          value: selectedJob,
-                          onChanged: (String? newValue) {
-                            setState(() {
-                              selectedJob = newValue!;
-                              selectedSubJob = '직무';
-                            });
-                          },
-                          items: jobs.map((String value) {
-                            return DropdownMenuItem<String>(
-                              value: value,
-                              child: Container(
-                                child: Text(value),
-                                constraints: BoxConstraints(
-                                    maxWidth:
-                                        MediaQuery.of(context).size.width *
-                                            0.5), // 50% 화면 너비
-                              ),
-                            );
-                          }).toList(),
-                          isExpanded: true,
-                          iconSize: 24,
-                          iconEnabledColor: Color(0xFFBFC0C7),
-                          decoration: InputDecoration(
-                            border: InputBorder.none,
-                            contentPadding: EdgeInsets.symmetric(
-                                vertical: 10.0,
-                                horizontal: 10.0), // 선택된 텍스트 내부 여백
-                          ),
-                        ),
-                      ),
                     ),
                   ),
                 ),
@@ -683,7 +673,7 @@ class _FirstPageState extends State<FirstPage> {
                 Container(
                   height: 40.0,
                   child: TextField(
-                    controller: fieldController,
+                    controller: roleController,
                     decoration: InputDecoration(
                       hintText: '직무',
                       contentPadding: EdgeInsets.symmetric(
@@ -700,6 +690,7 @@ class _FirstPageState extends State<FirstPage> {
                           onChanged: (String? newValue) {
                             setState(() {
                               selectedSubJob = newValue!;
+                              roleController.text = newValue;
                             });
                           },
                           items: subJobs[selectedJob]!.map((String value) {
@@ -834,13 +825,48 @@ class _FirstPageState extends State<FirstPage> {
               ),
               minimumSize: Size(double.infinity, 49), // 버튼의 최소 크기 설정
             ),
+            // onPressed: () {
+            //   updateUserData();
+            //   Navigator.of(context).push(
+            //     MaterialPageRoute(
+            //       builder: (context) => SecondPage(userData: userData),
+            //     ),
+            //   );
+            // },
             onPressed: () {
               updateUserData();
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (context) => SecondPage(userData: userData),
-                ),
-              );
+              if (nicknameController.text.isEmpty ||
+                  phoneController.text.isEmpty ||
+                  ageController.text.isEmpty ||
+                  fieldController.text.isEmpty ||
+                  roleController.text.isEmpty ||
+                  tenureController.text.isEmpty ||
+                  companyController.text.isEmpty ||
+                  profileController.text.isEmpty) {
+                showDialog(
+                  context: context,
+                  builder: (BuildContext context) {
+                    return AlertDialog(
+                      title: Text("경고"),
+                      content: Text("모든 정보를 입력해주세요."),
+                      actions: <Widget>[
+                        TextButton(
+                          child: Text('확인'),
+                          onPressed: () {
+                            Navigator.of(context).pop(); // 대화 상자 닫기
+                          },
+                        ),
+                      ],
+                    );
+                  },
+                );
+              } else {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => SecondPage(userData: userData),
+                  ),
+                );
+              }
             },
             child: Text(
               "다음",
